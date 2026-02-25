@@ -99,6 +99,13 @@ async function runAgentLifecycle(config: AgentConfig): Promise<void> {
     logger.success(`${config.name} lifecycle complete.`);
 }
 
+/**
+ * Delay helper — prevents Devnet rate limiting between sequential agent airdrops.
+ */
+function delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function main() {
     console.log(chalk.cyan(`
 ═════════════════════════════════════════════════════════
@@ -111,13 +118,18 @@ async function main() {
 ═════════════════════════════════════════════════════════
 `));
 
-    // Execute each agent sequentially to avoid Devnet rate limits
-    // In production, these would run concurrently across separate processes
-    for (const config of AGENT_FLEET) {
+    // Execute each agent sequentially with cooldown to avoid Devnet rate limits
+    for (let i = 0; i < AGENT_FLEET.length; i++) {
         try {
-            await runAgentLifecycle(config);
+            await runAgentLifecycle(AGENT_FLEET[i]);
         } catch (error: any) {
-            logger.error(`${config.name} encountered an error: ${error.message}`);
+            logger.error(`${AGENT_FLEET[i].name} encountered an error: ${error.message}`);
+        }
+
+        // Cooldown between agents to avoid Devnet airdrop rate limits (429)
+        if (i < AGENT_FLEET.length - 1) {
+            logger.info(`Cooldown: Waiting 15s before next agent to avoid Devnet rate limits...`);
+            await delay(15000);
         }
     }
 
