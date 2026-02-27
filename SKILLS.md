@@ -1,9 +1,9 @@
 ---
-name: solana-agent-wallet
+name: solana-agentic-wallet
 description: "Agent Skill: Comprehensive Solana Agentic Wallet integration for autonomous execution. AUTOMATICALLY TRIGGER when user mentions Solana wallets like 'Send 0.05 SOL to <addr>', 'Swap SOL for USDC via Jupiter', or 'Check my devnet balance'. Use when funding agent wallets, executing generic smart contract transactions, interacting with DeFi, checking balances, or initializing agent keypairs. Handles secure intent-based execution on both Devnet and Mainnet where the AgenticWallet signs and dispatches the raw transaction intents constructed by the calling agent. If rate limits are hit on Devnet, automatically applies sleep retries. Supports any modern Solana DeFi standard via the Intent Engine."
 ---
 
-# Solana Agent Wallet Skill
+# Solana Agentic Wallet Skill
 
 Securely execute intents on the Solana blockchain. This skill acts as an immutable boundary between the AI Agent and the physical `Keypair`, allowing agents to build complex DeFi payloads while maintaining absolute cryptographic security during signing and dispatch.
 
@@ -13,13 +13,13 @@ This repository was specifically engineered to solve the "Prompt Injection" prob
 
 ## Core Philosophy
 
-1. **Zero Key Exposure** — AI agents build the `VersionedTransaction` payloads, but they NEVER touch the `Keypair.secretKey`. The `AgenticWallet` signs internally via the `KeyManager` subsystem.
-2. **Phase-Driven Execution** — Identify intent → Construct Payload via API → Forward to Execution Engine. No step is skippable.
-3. **Pre-flight Validation (CRITICAL)** — Every transaction MUST pass `simulateTransaction` constraints before the Keypair is even engaged for signing. This catches slippage, account state changes, and insufficient balance errors before committing.
-4. **API-First DeFi** — Complex payloads (like Raydium routers, Jupiter aggregations, MarginFi lending) are fetched from dedicated endpoints (like Jupiter API), NOT manually constructed by the LLM.
-5. **Deterministic Routing** — Hardcoded `IntentEngine` maps guarantee predictable execution paths. The orchestrator uses the Strategy Pattern to map intent types to their handlers.
-6. **Immutable Audit Trail** — Every intent execution (success or failure) is logged with timestamp, intent type, options metadata, and result to `.agent_wallets/audit_log.json`.
-7. **Network Agnostic** — The skill adapts its behavior based on the RPC endpoint. Devnet enables airdrops; Mainnet enforces priority fees. The agent does not need to manage this.
+1. **Zero Key Exposure**: AI agents build the `VersionedTransaction` payloads, but they NEVER touch the `Keypair.secretKey`. The `AgenticWallet` signs internally via the `KeyManager` subsystem.
+2. **Phase-Driven Execution**: Identify intent → Construct Payload via API → Forward to Execution Engine. No step is skippable.
+3. **Pre-flight Validation (CRITICAL)**: Every transaction MUST pass `simulateTransaction` constraints before the Keypair is even engaged for signing. This catches slippage, account state changes, and insufficient balance errors before committing.
+4. **API-First DeFi**: Complex payloads (like Raydium routers, Jupiter aggregations, MarginFi lending) are fetched from dedicated endpoints (like Jupiter API), NOT manually constructed by the LLM.
+5. **Deterministic Routing**: Hardcoded `IntentEngine` maps guarantee predictable execution paths. The orchestrator uses the Strategy Pattern to map intent types to their handlers.
+6. **Immutable Audit Trail**: Every intent execution (success or failure) is logged with timestamp, intent type, options metadata, and result to `.agent_wallets/audit_log.json`.
+7. **Network Agnostic**: The skill adapts its behavior based on the RPC endpoint. Devnet enables airdrops; Mainnet enforces priority fees. The agent does not need to manage this.
 
 ---
 
@@ -271,7 +271,7 @@ await agent.executeIntent('DEFI_EXECUTION', {
 - For VersionedTransaction: the message must be properly formatted v0
 
 **Post-conditions:**
-- Pre-flight simulation passes before signing
+- Pre flight simulation passes before signing
 - Transaction is signed by the AgenticWallet's Keypair
 - Network dispatch occurs with confirmation waiting
 - Full audit trail is recorded
@@ -335,12 +335,12 @@ Agent.executeIntent()
 
 These invariants are NEVER violated, regardless of agent behavior:
 
-1. **The `secretKey` never leaves `AgenticWallet`** — No method returns or logs the key bytes. The `KeyManager.loadOrGenerate()` method returns a `Keypair` object that is stored as a private class member.
-2. **Simulation happens BEFORE signing** — A malicious transaction cannot trick the wallet into signing first. The simulation uses the unsigned transaction bytes.
-3. **The `TransactionValidator` runs BEFORE simulation** — Structural validation (instruction count, size) happens before any RPC call, preventing malformed transactions from reaching the network layer.
-4. **Audit logging happens regardless of outcome** — Both successful and failed intents are recorded for forensic review. The log includes the intent type, options metadata (with sensitive bytes stripped), and the result.
-5. **The Agent cannot bypass the Orchestrator** — There is no public method on `AgenticWallet` that accepts raw instructions without going through the intent pipeline.
-6. **The Keypair file is never read by the agent** — Only `KeyManager.ts` reads `.agent_wallets/*_wallet.json`. The agent code has no import path to this data.
+1. **The `secretKey` never leaves `AgenticWallet`**: No method returns or logs the key bytes. The `KeyManager.loadOrGenerate()` method returns a `Keypair` object that is stored as a private class member.
+2. **Simulation happens BEFORE signing**: A malicious transaction cannot trick the wallet into signing first. The simulation uses the unsigned transaction bytes.
+3. **The `TransactionValidator` runs BEFORE simulation**: Structural validation (instruction count, size) happens before any RPC call, preventing malformed transactions from reaching the network layer.
+4. **Audit logging happens regardless of outcome**: Both successful and failed intents are recorded for forensic review. The log includes the intent type, options metadata (with sensitive bytes stripped), and the result.
+5. **The Agent cannot bypass the Orchestrator**: There is no public method on `AgenticWallet` that accepts raw instructions without going through the intent pipeline.
+6. **The Keypair file is never read by the agent**: Only `KeyManager.ts` reads `.agent_wallets/*_wallet.json`. The agent code has no import path to this data.
 
 ---
 
@@ -365,10 +365,10 @@ If Devnet throws a `429 Too Many Requests` during a `FUND` or transaction execut
 **Multi-Agent Demo Fallback (3-stage):**
 The `multi-agent-demo.ts` implements a progressive funding strategy:
 
-1. **Check balances** — if any agent already has SOL, it becomes Commander.
-2. **Try airdrop** — attempts `FUND` intent for the first agent.
-3. **Browser fallback** — if airdrop fails (429), opens the default browser to `https://faucet.solana.com/?address=<ADDRESS>` and waits for the user to press Enter after funding.
-4. **Commander distributes** — the funded agent distributes SOL to all unfunded peers via `TRANSFER`.
+1. **Check balances**: if any agent already has SOL, it becomes Commander.
+2. **Try airdrop**: attempts `FUND` intent for the first agent.
+3. **Browser fallback**: if airdrop fails (429), opens the default browser to `https://faucet.solana.com/?address=<ADDRESS>` and waits for the user to press Enter after funding.
+4. **Commander distributes**: the funded agent distributes SOL to all unfunded peers via `TRANSFER`.
 
 ```typescript
 // Stage 1: Try airdrop
@@ -492,15 +492,15 @@ Understand the internal structure to know where to interface:
 │  VAULT BOUNDARY (No LLM access below this line)     │
 │                              │                      │
 │  ┌───────────────────────────▼──────────────────┐   │
-│  │           AgenticWallet                       │   │
+│  │           AgenticWallet                      │   │
 │  │  ┌─────────────┐  ┌──────────────────────┐   │   │
-│  │  │ KeyManager  │  │ TransactionValidator  │   │   │
-│  │  │ (secretKey) │  │ (bounds checking)     │   │   │
+│  │  │ KeyManager  │  │ TransactionValidator │   │   │
+│  │  │ (secretKey) │  │ (bounds checking)    │   │   │
 │  │  └─────────────┘  └──────────────────────┘   │   │
 │  └──────────────────────────────────────────────┘   │
 │                              │                      │
 │  ┌───────────────────────────▼──────────────────┐   │
-│  │           RpcService                          │   │
+│  │           RpcService                         │   │
 │  │  ┌──────────────┐  ┌─────────────────────┐   │   │
 │  │  │ simulate()   │  │ sendTransaction()   │   │   │
 │  │  │ (pre-flight) │  │ (network dispatch)  │   │   │
@@ -558,7 +558,7 @@ for (const { account } of tokenAccounts.value) {
 
 ### Token Metadata Resolution
 
-To get human-readable token names and symbols, query the token metadata:
+To get human readable token names and symbols, query the token metadata:
 
 ```typescript
 // Option A: Use Jupiter Token List API (recommended)
@@ -942,13 +942,13 @@ connection.onAccountChange(walletPublicKey, (accountInfo) => {
 
 | Term | Definition |
 |------|-----------|
-| **ATA** | Associated Token Account — deterministically derived account for holding SPL tokens |
-| **ALT** | Address Lookup Table — reduces transaction size by referencing accounts by index |
-| **BPS** | Basis Points — 1 BPS = 0.01%. Used for slippage (50 BPS = 0.5%) |
-| **CU** | Compute Units — Solana's measure of computational cost per transaction |
+| **ATA** | Associated Token Account: deterministically derived account for holding SPL tokens |
+| **ALT** | Address Lookup Table: reduces transaction size by referencing accounts by index |
+| **BPS** | Basis Points: 1 BPS = 0.01%. Used for slippage (50 BPS = 0.5%) |
+| **CU** | Compute Units: Solana's measure of computational cost per transaction |
 | **Intent** | A typed action request (`FUND`, `TRANSFER`, `DEFI_EXECUTION`) |
 | **Lamports** | Smallest SOL unit. 1 SOL = 1,000,000,000 lamports |
-| **PDA** | Program Derived Address — deterministic address owned by a program |
+| **PDA** | Program Derived Address: deterministic address owned by a program |
 | **Rent** | SOL locked in an account to keep it alive (~0.00203928 SOL per account) |
 | **v0** | VersionedTransaction message format supporting Address Lookup Tables |
 | **Vault** | The `AgenticWallet` boundary that protects the private key |
@@ -957,7 +957,7 @@ connection.onAccountChange(walletPublicKey, (accountInfo) => {
 
 ---
 
-## AgentBrain — Autonomous Decision Engine
+## AgentBrain: Autonomous Decision Engine
 
 The `AgentBrain` is the autonomous decision-making layer that turns a wallet into an agent. It runs a Perceive → Evaluate → Act cycle.
 
@@ -1009,7 +1009,7 @@ interface AgentState {
 
 ---
 
-## SplTokenService — SPL Token Operations
+## SplTokenService: SPL Token Operations
 
 The `SplTokenService` provides programmatic token operations:
 

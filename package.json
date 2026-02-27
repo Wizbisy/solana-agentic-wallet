@@ -1,5 +1,5 @@
 {
-  "name": "solana-agent-wallet",
+  "name": "solana-agentic-wallet",
   "version": "1.0.0",
   "description": "An autonomous AI agent wallet for Solana",
   "main": "dist/index.js",
