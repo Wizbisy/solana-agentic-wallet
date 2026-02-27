@@ -2,7 +2,7 @@
 
 A secure, intent-driven infrastructure for autonomous AI agents executing on-chain operations on the Solana blockchain.
 
-This project solves the **Prompt Injection Problem** — ensuring that even if an LLM is compromised, it cannot extract private key material. The architecture enforces a strict **Vault & Orchestrator** model where all cryptographic signing is physically sandboxed from the agent's decision context.
+This project solves the **Prompt Injection Problem** ensuring that even if an LLM is compromised, it cannot extract private key material. The architecture enforces a strict **Vault & Orchestrator** model where all cryptographic signing is physically sandboxed from the agent's decision context.
 
 ## Key Features
 
@@ -122,7 +122,7 @@ Deploys three independent agents (`Alpha-Trader`, `Beta-Sentinel`, `Gamma-Audito
 
 | Document | Purpose |
 |----------|---------|
-| [SKILLS.md](SKILLS.md) | Agent integration guide — phases, triggers, security boundaries, and extension patterns |
+| [SKILLS.md](SKILLS.md) | Agent integration guide phases, triggers, security boundaries, and extension patterns |
 | [EXECUTION_PRESETS.md](EXECUTION_PRESETS.md) | Execution blueprints for Jupiter, Raydium, Orca, Marinade, SPL tokens, and more |
 
 ## Tech Stack
