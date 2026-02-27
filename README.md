@@ -6,14 +6,14 @@ This project solves the **Prompt Injection Problem** ensuring that even if an LL
 
 ## Key Features
 
-- **AgentBrain** — Rule-based autonomous decision engine. Agents perceive on-chain state, evaluate configurable rules, and execute actions without human input.
-- **Zero Key Exposure** — The AI agent never touches `secretKey`. All signing happens inside the sandboxed `AgenticWallet`.
-- **Intent-Based Execution** — Agents route typed intents (`FUND`, `TRANSFER`, `DEFI_EXECUTION`, `TOKEN_TRANSFER`) through the Strategy Pattern orchestrator.
-- **SPL Token Support** — Create mints, manage Associated Token Accounts, mint and transfer SPL tokens programmatically.
-- **Pre-flight Validation** — Every transaction is simulated via RPC before the keypair is engaged for signing.
-- **VersionedTransaction Support** — Full `v0` message support for complex DeFi operations.
-- **Multi-Agent Scalability** — Deploy multiple independent agents, each with their own keypair, balance, and audit trail.
-- **Immutable Audit Trail** — Every intent execution is logged to `.agent_wallets/audit_log.json`.
+- **AgentBrain**: Rule-based autonomous decision engine. Agents perceive on-chain state, evaluate configurable rules, and execute actions without human input.
+- **Zero Key Exposure**: The AI agent never touches `secretKey`. All signing happens inside the sandboxed `AgenticWallet`.
+- **Intent-Based Execution**: Agents route typed intents (`FUND`, `TRANSFER`, `DEFI_EXECUTION`, `TOKEN_TRANSFER`) through the Strategy Pattern orchestrator.
+- **SPL Token Support**: Create mints, manage Associated Token Accounts, mint and transfer SPL tokens programmatically.
+- **Pre-flight Validation**: Every transaction is simulated via RPC before the keypair is engaged for signing.
+- **VersionedTransaction Support**: Full `v0` message support for complex DeFi operations.
+- **Multi-Agent Scalability**: Deploy multiple independent agents, each with their own keypair, balance, and audit trail.
+- **Immutable Audit Trail**: Every intent execution is logged to `.agent_wallets/audit_log.json`.
 
 ## Architecture
 
@@ -99,7 +99,7 @@ AGENT_NAME=Nexus-Prime
 npm start
 ```
 
-Initializes the KeyManager, funds the wallet, executes a transfer with pre-flight validation, and logs all outcomes to the audit trail.
+Initializes the KeyManager, funds the wallet, executes a transfer with pre flight validation, and logs all outcomes to the audit trail.
 
 ### 4. Run Multi-Agent Fleet
 
@@ -110,7 +110,7 @@ npm run agent:multi
 Deploys three independent agents (`Alpha-Trader`, `Beta-Sentinel`, `Gamma-Auditor`) using the **Commander funding model**:
 
 1. All agent wallets are created programmatically
-2. If no agents are funded, attempts an airdrop — if that fails, **opens the browser** to the [Solana Faucet](https://faucet.solana.com) with the address pre-filled
+2. If no agents are funded, attempts an airdrop, if that fails, **opens the browser** to the [Solana Faucet](https://faucet.solana.com) with the address pre filled
 3. After funding, the Commander distributes SOL to unfunded peers via `TRANSFER`
 4. Each agent runs its own `AgentBrain` decision loop
 5. Rules evaluated: `FUND_IF_LOW`, `DEFI_ROUTE_VALIDATION`, `DISTRIBUTE_SOL`, `WRITE_ATTESTATION`
@@ -122,7 +122,7 @@ Deploys three independent agents (`Alpha-Trader`, `Beta-Sentinel`, `Gamma-Audito
 
 | Document | Purpose |
 |----------|---------|
-| [SKILLS.md](SKILLS.md) | Agent integration guide phases, triggers, security boundaries, and extension patterns |
+| [SKILLS.md](SKILLS.md) | Agent integration, guide phases, triggers, security boundaries, and extension patterns |
 | [EXECUTION_PRESETS.md](EXECUTION_PRESETS.md) | Execution blueprints for Jupiter, Raydium, Orca, Marinade, SPL tokens, and more |
 
 ## Tech Stack
@@ -130,7 +130,7 @@ Deploys three independent agents (`Alpha-Trader`, `Beta-Sentinel`, `Gamma-Audito
 - **Runtime**: TypeScript / Node.js
 - **Blockchain**: `@solana/web3.js`, `@solana/spl-token`
 - **Agent Logic**: Custom `AgentBrain` with configurable rule engine
-- **Security**: Sandboxed `KeyManager` with file-based keypair storage
+- **Security**: Sandboxed `KeyManager` with file based keypair storage
 - **Logging**: Structured CLI output via `chalk` + JSON audit trail
 
 ## License
