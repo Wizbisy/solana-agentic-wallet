@@ -12,9 +12,9 @@ export interface AuditRecord {
 }
 
 /**
- * Local NoSQL Document Database for Auditing Agent Intent execution logs.
- * Persists JSON records immediately to disk for compliance and debugging.
- */
+  Local NoSQL Document Database for Auditing Agent Intent execution logs.
+  Persists JSON records immediately to disk for compliance and debugging.
+ **/
 export class AuditLogger {
     private static dbPath = path.resolve(process.cwd(), '.agent_wallets/audit_log.json');
 

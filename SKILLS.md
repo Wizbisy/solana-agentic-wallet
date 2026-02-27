@@ -147,7 +147,9 @@ This module contains specialized internal systems that work together:
 
 | Sub-Skill | Component | Purpose |
 |-----------|-----------|---------|
+| `agent-brain` | `AgentBrain.ts` + `AgentState.ts` | Autonomous decision engine with rule-based Perceive → Evaluate → Act loop |
 | `agentic-wallet` | `AgenticWallet.ts` + `KeyManager.ts` | Physical keypair security, vault signing, and network execution |
+| `spl-tokens` | `SplTokenService.ts` | SPL token mint, ATA management, token transfers, and balance queries |
 | `intent-engine` | `IntentOrchestrator.ts` + Handlers | Evaluation of AI choices and raw transaction construction routing |
 | `rpc-layer` | `RpcService.ts` | Network abstraction, simulation, blockhash management, and dispatch |
 | `audit-chain` | `AuditLogger.ts` | Immutable logging of every intent execution to the JSON data store |
@@ -204,9 +206,9 @@ await agent.executeIntent('FUND');
 await agent.executeIntent('FUND', { amount: 1 });
 ```
 
-**Fallback Behavior**: If the RPC faucet returns a 429 rate-limit error, the `FundIntentHandler` will automatically:
+**Fallback Behavior**: If the RPC faucet returns a 429 rate-limit error, the `FundIntentHandler` will:
 1. Log the error to the audit trail.
-2. Open the user's browser to the official Solana Faucet (`https://faucet.solana.com`) with the wallet address pre-filled.
+2. Print the faucet URL to the console for manual claiming.
 3. Return `false` to the caller to indicate manual intervention is needed.
 
 **Pre-conditions:**
@@ -357,16 +359,31 @@ If Devnet throws a `429 Too Many Requests` during a `FUND` or transaction execut
 
 **Agent Response:**
 1. Catch the exception.
-2. Alert the user that Devnet RPC public limits are temporarily strained.
-3. The `FundIntentHandler` will automatically open the official browser faucet.
-4. Recommend the user wait 30-60 seconds before retrying.
+2. Log the faucet URL to the console for manual claiming.
+3. Return `false` so the caller can handle the failure.
+
+**Multi-Agent Demo Fallback (3-stage):**
+The `multi-agent-demo.ts` implements a progressive funding strategy:
+
+1. **Check balances** — if any agent already has SOL, it becomes Commander.
+2. **Try airdrop** — attempts `FUND` intent for the first agent.
+3. **Browser fallback** — if airdrop fails (429), opens the default browser to `https://faucet.solana.com/?address=<ADDRESS>` and waits for the user to press Enter after funding.
+4. **Commander distributes** — the funded agent distributes SOL to all unfunded peers via `TRANSFER`.
 
 ```typescript
-// The FUND handler already handles this gracefully:
-const result = await agent.executeIntent('FUND');
-if (result === false) {
-    // Faucet rate-limited, browser opened for manual claim
-    console.log("Please claim SOL manually from the faucet page.");
+// Stage 1: Try airdrop
+await firstAgent.executeIntent('FUND', { amount: 1 });
+
+// Stage 2: If airdrop fails, open browser to faucet
+exec(`start https://faucet.solana.com/?address=${address}`);
+// Wait for user to fund and press Enter...
+
+// Stage 3: Commander distributes to peers
+for (const peer of unfundedAgents) {
+    await commander.executeIntent('TRANSFER', {
+        target: peer.getPublicKey(),
+        amount: 0.05,
+    });
 }
 ```
 
@@ -422,6 +439,8 @@ Understand the internal structure to know where to interface:
 |------|---------|-------------|
 | `src/core/AIAgent.ts` | Public orchestrator interface. Used to invoke intents. | **Full Access** |
 | `src/core/AgenticWallet.ts` | Vault border. Signs bytes and executes simulations. | **Via intents only** |
+| `src/agent/AgentBrain.ts` | Rule-based autonomous decision engine (Perceive → Evaluate → Act) | **Full Access** |
+| `src/agent/AgentState.ts` | Persistent state tracking (SOL balance, token balances, cycles, last action) | **Full Access** |
 | `src/intents/IntentOrchestrator.ts` | Routing handler (Strategy Pattern). Maps parameters to handlers. | Internal |
 | `src/intents/types.ts` | Intent type definitions and option interfaces. | Reference |
 
@@ -429,9 +448,16 @@ Understand the internal structure to know where to interface:
 
 | File | Intent Type | What It Does |
 |------|-------------|-------------|
-| `src/intents/handlers/FundIntent.ts` | `FUND` | Requests Devnet airdrop, falls back to browser faucet |
+| `src/intents/handlers/FundIntent.ts` | `FUND` | Requests Devnet airdrop, logs faucet URL on failure |
 | `src/intents/handlers/TransferIntent.ts` | `TRANSFER` | Builds `SystemProgram.transfer` instruction |
 | `src/intents/handlers/DefiIntent.ts` | `DEFI_EXECUTION` | Passes pre-built transactions directly to the Wallet |
+
+### Services
+
+| File | Purpose | Agent Access |
+|------|---------|-------------|
+| `src/services/SplTokenService.ts` | SPL token mint creation, ATA management, token minting and transfers | **Full Access** |
+| `src/services/RpcService.ts` | Network connection, simulation, blockhash, and dispatch. | Internal |
 
 ### Infrastructure
 
@@ -439,7 +465,6 @@ Understand the internal structure to know where to interface:
 |------|---------|-------------|
 | `src/security/KeyManager.ts` | Physical Keypair loader/generator. | **Zero Access** (Sandboxed) |
 | `src/security/TransactionValidator.ts` | Validates instruction count and payload structure. | Internal |
-| `src/services/RpcService.ts` | Network connection, simulation, blockhash, and dispatch. | Internal |
 | `src/db/AuditLogger.ts` | JSON store for intent execution outcomes. | Internal |
 | `src/config/env.ts` | Environment variable binding and defaults. | Reference |
 | `src/config/constants.ts` | Static configuration constants. | Reference |
@@ -643,6 +668,7 @@ if (status.value?.confirmationStatus === 'finalized') {
 | `FUND` | `{ amount?: number }` | N/A (RPC Airdrop) | ✅ Yes |
 | `TRANSFER` | `{ target: PublicKey, amount: number }` | Legacy `Transaction` (built internally) | ✅ Yes |
 | `DEFI_EXECUTION` | `{ transaction: Transaction \| VersionedTransaction }` | Caller-provided | Agent builds payload |
+| `TOKEN_TRANSFER` | `{ target: PublicKey, amount: number, mint: PublicKey }` | Legacy `Transaction` (built internally) | ✅ Yes |
 
 ### Common Token Mint Addresses
 
@@ -713,7 +739,7 @@ To add a new intent type (e.g., `STAKE`, `NFT_MINT`, `BATCH`), follow these step
 ### Step 1: Define the Intent Type
 Add the new type to `src/intents/types.ts`:
 ```typescript
-export type IntentType = 'FUND' | 'TRANSFER' | 'DEFI_EXECUTION' | 'STAKE';
+export type IntentType = 'FUND' | 'TRANSFER' | 'DEFI_EXECUTION' | 'TOKEN_TRANSFER' | 'STAKE';
 ```
 
 ### Step 2: Create the Handler
@@ -825,6 +851,14 @@ If connection timeout or ECONNREFUSED:
 
 When multiple AI agents share the same wallet infrastructure:
 
+### Commander Funding Model (Recommended)
+- On first run, the demo attempts an airdrop for the first agent.
+- If the airdrop fails (429), it **opens the browser** to the Solana Faucet with the address pre-filled.
+- The user funds manually, presses Enter, and the funded agent becomes Commander.
+- Commander distributes SOL to all unfunded peers via `TRANSFER` intent.
+- No manual intervention needed after the initial fund.
+- Run via: `npm run agent:multi`
+
 ### Shared Wallet (Not Recommended)
 - Multiple agents use the same `AGENT_NAME`, accessing the same keypair.
 - Risk: Race conditions on nonce/blockhash. One agent's transaction may invalidate another's.
@@ -918,6 +952,97 @@ connection.onAccountChange(walletPublicKey, (accountInfo) => {
 | **Rent** | SOL locked in an account to keep it alive (~0.00203928 SOL per account) |
 | **v0** | VersionedTransaction message format supporting Address Lookup Tables |
 | **Vault** | The `AgenticWallet` boundary that protects the private key |
+| **AgentBrain** | Rule-based decision engine that drives autonomous agent behavior |
+| **AgentState** | Persistent state container tracking balance, tokens, cycles |
+
+---
+
+## AgentBrain — Autonomous Decision Engine
+
+The `AgentBrain` is the autonomous decision-making layer that turns a wallet into an agent. It runs a Perceive → Evaluate → Act cycle.
+
+### How It Works
+
+```typescript
+import { AIAgent } from './core/AIAgent';
+import { AgentBrain } from './agent/AgentBrain';
+
+const agent = new AIAgent('Alpha-Trader');
+const brain = new AgentBrain(agent);
+
+// Add custom rules
+brain.addRule({
+    label: 'DEFI_ROUTE_VALIDATION',
+    priority: 5,
+    condition: (state) => state.solBalance >= 0.005,
+    action: 'DEFI_EXECUTION',
+    buildOptions: (state) => ({ transaction: myPayload }),
+});
+
+// Run a single decision cycle
+const plan = await brain.runCycle();
+// plan = { ruleFired: 'DEFI_ROUTE_VALIDATION', action: 'DEFI_EXECUTION', options: {...} }
+```
+
+### Default Rules
+
+| Rule | Priority | Condition | Action |
+|------|----------|-----------|--------|
+| `FUND_IF_LOW` | 1 | SOL balance < 0.005 | `FUND` |
+| `ATTEST_CYCLE` | 10 | SOL balance >= 0.005 | `DEFI_EXECUTION` |
+
+### AgentState
+
+The `AgentState` interface tracks persistent state across decision cycles:
+
+```typescript
+interface AgentState {
+    name: string;
+    publicKey: string;
+    solBalance: number;
+    tokenBalances: Map<string, number>;
+    lastActionTimestamp: number;
+    lastAction: string;
+    cyclesCompleted: number;
+}
+```
+
+---
+
+## SplTokenService — SPL Token Operations
+
+The `SplTokenService` provides programmatic token operations:
+
+```typescript
+import { SplTokenService } from './services/SplTokenService';
+
+const tokenService = new SplTokenService();
+
+// Create a new token mint
+const mint = await tokenService.createTokenMint(payerKeypair, 9);
+
+// Get or create an Associated Token Account
+const ata = await tokenService.getOrCreateAta(payerKeypair, mint, ownerPublicKey);
+
+// Mint tokens
+await tokenService.mintTokens(payerKeypair, mint, ata.address, 1000);
+
+// Transfer tokens
+await tokenService.transferTokens(payerKeypair, sourceAta, destAta, ownerKeypair, 50);
+
+// Check balance
+const balance = await tokenService.getTokenBalance(ata.address);
+```
+
+### Available Methods
+
+| Method | Purpose |
+|--------|---------|
+| `createTokenMint(payer, decimals)` | Create a new SPL token mint |
+| `getOrCreateAta(payer, mint, owner)` | Get or create an Associated Token Account |
+| `mintTokens(payer, mint, dest, amount)` | Mint tokens to an ATA |
+| `transferTokens(payer, source, dest, owner, amount)` | Transfer SPL tokens between ATAs |
+| `getTokenBalance(ataAddress)` | Query token balance for an ATA |
 
 ---
 

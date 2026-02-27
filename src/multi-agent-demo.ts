@@ -1,23 +1,26 @@
 import { PublicKey, Transaction, Keypair } from '@solana/web3.js';
 import { AIAgent } from './core/AIAgent';
+import { AgentBrain } from './agent/AgentBrain';
 import { logger } from './utils/logger';
 import { ENV } from './config/env';
 import chalk from 'chalk';
+import { exec } from 'child_process';
 
 /**
- * Multi-Agent Demonstration
- *
- * Spins up three independent AI agents, each with their own isolated keypair
- * and wallet instance. Demonstrates concurrent autonomous execution where
- * each agent manages its own balance, transfers, and DeFi operations
- * without interfering with the others.
- *
- * Funding Strategy: A single "Fleet Commander" agent receives the Devnet airdrop,
- * then distributes SOL to the other agents via TRANSFER intents. This avoids
- * Devnet rate limits (429) from multiple airdrop requests.
- */
+  Multi-Agent Autonomous Demonstration
+
+  Deploys three independent AI agents on Solana Devnet.
+  Uses a "Commander" funding model — the funded agent distributes
+  SOL to peers via TRANSFER, avoiding Devnet airdrop rate limits.
+
+  Each agent then runs an autonomous AgentBrain decision loop:
+    Perceive on-chain state → Evaluate rules → Execute action
+
+  Prerequisites: Fund at least one agent address via https://faucet.solana.com
+**/
 
 const MEMO_PROGRAM_ID = new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
+const FUND_AMOUNT = 0.05;
 
 interface AgentConfig {
     name: string;
@@ -25,154 +28,237 @@ interface AgentConfig {
 }
 
 const AGENT_FLEET: AgentConfig[] = [
-    { name: 'Alpha-Trader',   role: 'Autonomous DeFi Execution Agent' },
-    { name: 'Beta-Sentinel',  role: 'Balance Monitoring & Transfer Agent' },
+    { name: 'Alpha-Trader',   role: 'DeFi Execution Agent' },
+    { name: 'Beta-Sentinel',  role: 'Transfer & Distribution Agent' },
     { name: 'Gamma-Auditor',  role: 'On-Chain Attestation Agent' },
 ];
 
-/**
- * Delay helper — prevents Devnet rate limiting between sequential operations.
- */
 function delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
- * Execute an independent agent mission (post-funding):
- * 1. Report balance
- * 2. Execute role-specific intents
- * 3. Report final state
- */
-async function runAgentMission(agent: AIAgent, config: AgentConfig): Promise<void> {
-    const separator = '─'.repeat(50);
+  Commander Funding — the agent with the highest balance
+  distributes SOL to all unfunded peers via TRANSFER intent.
+**/
+async function fundFleetFromCommander(agents: AIAgent[]): Promise<void> {
+    const balances = await Promise.all(agents.map(a => a.getBalance()));
 
-    console.log(chalk.magenta(`\n${separator}`));
-    console.log(chalk.magenta(`  Agent: ${config.name}`));
-    console.log(chalk.magenta(`  Role:  ${config.role}`));
-    console.log(chalk.magenta(separator));
-
-    const balance = await agent.getBalance();
-    logger.agent(config.name, `Balance: ${balance} SOL`);
-
-    if (balance < 0.001) {
-        logger.warn(`${config.name}: Insufficient balance for operations. Skipping mission.`);
-        return;
-    }
-
-    switch (config.name) {
-        case 'Alpha-Trader': {
-            logger.agent(config.name, 'Executing DeFi payload validation...');
-            const defiPayload = new Transaction().add({
-                keys: [{ pubkey: agent.getPublicKey(), isSigner: true, isWritable: true }],
-                programId: MEMO_PROGRAM_ID,
-                data: Buffer.from(`ALPHA:SWAP_ROUTE_VALIDATED:${Date.now()}`, 'utf-8'),
-            });
-            await agent.executeIntent('DEFI_EXECUTION', { transaction: defiPayload });
-            break;
-        }
-
-        case 'Beta-Sentinel': {
-            const targetAddress = Keypair.generate().publicKey;
-            logger.agent(config.name, `Initiating transfer to ${targetAddress.toBase58().slice(0, 8)}...`);
-            await agent.executeIntent('TRANSFER', {
-                target: targetAddress,
-                amount: 0.001
-            });
-            break;
-        }
-
-        case 'Gamma-Auditor': {
-            logger.agent(config.name, 'Writing on-chain audit attestation...');
-            const attestation = new Transaction().add({
-                keys: [{ pubkey: agent.getPublicKey(), isSigner: true, isWritable: true }],
-                programId: MEMO_PROGRAM_ID,
-                data: Buffer.from(`AUDIT:FLEET_INTEGRITY_VERIFIED:${new Date().toISOString()}`, 'utf-8'),
-            });
-            await agent.executeIntent('DEFI_EXECUTION', { transaction: attestation });
-            break;
+    let commanderIdx = 0;
+    let maxBalance = 0;
+    for (let i = 0; i < balances.length; i++) {
+        if (balances[i] > maxBalance) {
+            maxBalance = balances[i];
+            commanderIdx = i;
         }
     }
 
-    const finalBalance = await agent.getBalance();
-    logger.agent(config.name, `Final Balance: ${finalBalance} SOL`);
-    logger.success(`${config.name} mission complete.`);
+    const commander = agents[commanderIdx];
+    const commanderName = AGENT_FLEET[commanderIdx].name;
+
+    if (maxBalance < 0.01) {
+        // No agents funded — try airdrop, then browser fallback
+        const firstAgent = agents[0];
+        const address = firstAgent.getPublicKey().toBase58();
+        logger.info(`No funded agents detected. Attempting airdrop for ${AGENT_FLEET[0].name}...`);
+
+        try {
+            await firstAgent.executeIntent('FUND', { amount: 1 });
+            const newBal = await firstAgent.getBalance();
+            if (newBal >= 0.01) {
+                logger.success(`Airdrop succeeded! ${AGENT_FLEET[0].name} now has ${newBal.toFixed(4)} SOL.`);
+                commanderIdx = 0;
+                maxBalance = newBal;
+            } else {
+                throw new Error('Airdrop returned insufficient balance');
+            }
+        } catch {
+            const faucetUrl = `https://faucet.solana.com/?address=${address}`;
+            logger.warn(`Airdrop failed. Opening browser to Solana Faucet...`);
+            logger.info(`Faucet URL: ${faucetUrl}`);
+
+            // Open browser cross-platform
+            const openCmd = process.platform === 'win32' ? `start ${faucetUrl}`
+                          : process.platform === 'darwin' ? `open ${faucetUrl}`
+                          : `xdg-open ${faucetUrl}`;
+            exec(openCmd);
+
+            console.log(chalk.yellow(`\n  ⏳ Please fund ${AGENT_FLEET[0].name} in the browser, then press Enter to continue...`));
+            await new Promise<void>(resolve => {
+                process.stdin.once('data', () => resolve());
+            });
+
+            const recheckBal = await firstAgent.getBalance();
+            if (recheckBal < 0.01) {
+                logger.error(`${AGENT_FLEET[0].name} still has ${recheckBal.toFixed(4)} SOL. Please fund and re-run.`);
+                process.exit(1);
+            }
+            commanderIdx = 0;
+            maxBalance = recheckBal;
+            logger.success(`${AGENT_FLEET[0].name} funded! Balance: ${recheckBal.toFixed(4)} SOL`);
+        }
+    }
+
+    logger.info(`Commander: ${commanderName} (${maxBalance.toFixed(4)} SOL)`);
+
+    for (let i = 0; i < agents.length; i++) {
+        if (i === commanderIdx) continue;
+        if (balances[i] >= 0.01) {
+            logger.agent(commanderName, `${AGENT_FLEET[i].name} already funded (${balances[i].toFixed(4)} SOL). Skipping.`);
+            continue;
+        }
+
+        logger.agent(commanderName, `Funding ${AGENT_FLEET[i].name} with ${FUND_AMOUNT} SOL...`);
+        try {
+            await commander.executeIntent('TRANSFER', {
+                target: agents[i].getPublicKey(),
+                amount: FUND_AMOUNT,
+            });
+            logger.success(`${AGENT_FLEET[i].name} funded successfully.`);
+        } catch (error: any) {
+            logger.error(`Failed to fund ${AGENT_FLEET[i].name}: ${error.message}`);
+        }
+        await delay(2000);
+    }
+}
+
+/**
+  Runs an agent through its autonomous AgentBrain decision loop.
+**/
+async function runAgentWithBrain(agent: AIAgent, config: AgentConfig): Promise<void> {
+    const { name } = config;
+
+    console.log(chalk.bold.white(`\n--- ${name} (${config.role}) ---`));
+    logger.agent(name, `Wallet: ${agent.getPublicKey().toBase58()}`);
+
+    const brain = new AgentBrain(agent);
+
+    switch (name) {
+        case 'Alpha-Trader':
+            brain.addRule({
+                label: 'DEFI_ROUTE_VALIDATION',
+                priority: 5,
+                condition: (s) => s.solBalance >= 0.005,
+                action: 'DEFI_EXECUTION',
+                buildOptions: () => ({
+                    transaction: new Transaction().add({
+                        keys: [{ pubkey: agent.getPublicKey(), isSigner: true, isWritable: true }],
+                        programId: MEMO_PROGRAM_ID,
+                        data: Buffer.from(`DEFI_ROUTE:SOL_USDC:VALIDATED:${Date.now()}`, 'utf-8'),
+                    }),
+                }),
+            });
+            break;
+
+        case 'Beta-Sentinel':
+            brain.addRule({
+                label: 'DISTRIBUTE_SOL',
+                priority: 3,
+                condition: (s) => s.solBalance > 0.04,
+                action: 'TRANSFER',
+                buildOptions: () => ({
+                    target: Keypair.generate().publicKey,
+                    amount: 0.002,
+                }),
+            });
+            break;
+
+        case 'Gamma-Auditor':
+            brain.addRule({
+                label: 'WRITE_ATTESTATION',
+                priority: 5,
+                condition: (s) => s.solBalance >= 0.005,
+                action: 'DEFI_EXECUTION',
+                buildOptions: () => ({
+                    transaction: new Transaction().add({
+                        keys: [{ pubkey: agent.getPublicKey(), isSigner: true, isWritable: true }],
+                        programId: MEMO_PROGRAM_ID,
+                        data: Buffer.from(`AUDIT:FLEET_OK:${AGENT_FLEET.length}_AGENTS:${new Date().toISOString()}`, 'utf-8'),
+                    }),
+                }),
+            });
+            break;
+    }
+
+    for (let cycle = 0; cycle < 2; cycle++) {
+        const plan = await brain.runCycle();
+        if (!plan) {
+            logger.agent(name, 'No actionable rules. Idling.');
+            break;
+        }
+        await delay(1500);
+    }
+
+    const finalState = brain.getState();
+    logger.agent(name, `Final balance: ${finalState.solBalance.toFixed(4)} SOL | Cycles: ${finalState.cyclesCompleted} | Last action: ${finalState.lastAction}`);
+    logger.success(`${name} — autonomous loop complete.`);
 }
 
 async function main() {
     console.log(chalk.cyan(`
-═════════════════════════════════════════════════════════
- 🤖 SOLANA AI AGENT WALLET — MULTI-AGENT DEMONSTRATION
-═════════════════════════════════════════════════════════
- Environment : ${ENV.ENVIRONMENT}
- RPC Endpoint: ${ENV.SOLANA_RPC_URL}
- Agent Count : ${AGENT_FLEET.length}
- Vault Path  : ${ENV.WALLET_STORAGE_PATH}
-═════════════════════════════════════════════════════════
+=========================================================
+  SOLANA AI AGENT WALLET — Autonomous Fleet (Devnet)
+=========================================================
+  Environment : ${ENV.ENVIRONMENT}
+  RPC Endpoint: ${ENV.SOLANA_RPC_URL}
+  Agent Count : ${AGENT_FLEET.length}
+  Vault Path  : ${ENV.WALLET_STORAGE_PATH}
+=========================================================
 `));
 
-    // Phase 1: Initialize all agents (each gets their own isolated keypair)
-    logger.info('Phase 1: Initializing agent fleet...');
+    logger.info('Initializing agent fleet and loading wallets...');
     const agents: AIAgent[] = AGENT_FLEET.map(config => new AIAgent(config.name));
 
-    // Phase 2: Fund the Fleet Commander (first agent) via single airdrop
-    logger.info('Phase 2: Funding Fleet Commander via Devnet airdrop...');
-    const commander = agents[0];
-    const commanderBalance = await commander.getBalance();
-
-    if (commanderBalance < 0.05) {
-        await commander.executeIntent('FUND');
-        await delay(3000);
-    } else {
-        logger.agent(AGENT_FLEET[0].name, `Already funded (${commanderBalance} SOL). Skipping airdrop.`);
+    console.log(chalk.yellow('\n  Agent Addresses (fund via https://faucet.solana.com):'));
+    for (let i = 0; i < agents.length; i++) {
+        const balance = await agents[i].getBalance();
+        const status = balance > 0 ? chalk.green(`${balance.toFixed(4)} SOL`) : chalk.red('0 SOL — NEEDS FUNDING');
+        console.log(chalk.yellow(`    ${AGENT_FLEET[i].name}: ${agents[i].getPublicKey().toBase58()} [${status}${chalk.yellow(']')}`));
     }
+    console.log('');
 
-    // Phase 3: Commander distributes SOL to the fleet via TRANSFER intents
-    logger.info('Phase 3: Fleet Commander distributing SOL to agents...');
-    for (let i = 1; i < agents.length; i++) {
-        const agentBalance = await agents[i].getBalance();
-        if (agentBalance < 0.005) {
-            logger.agent(AGENT_FLEET[0].name, `Funding ${AGENT_FLEET[i].name}...`);
-            await commander.executeIntent('TRANSFER', {
-                target: agents[i].getPublicKey(),
-                amount: 0.01
-            });
-            await delay(2000);
-        } else {
-            logger.agent(AGENT_FLEET[i].name, `Already funded (${agentBalance} SOL). Skipping.`);
-        }
-    }
+    // Commander funding: funded agent distributes SOL to peers
+    logger.info('Running Commander funding protocol...');
+    await fundFleetFromCommander(agents);
+    await delay(3000);
 
-    // Phase 4: Execute independent agent missions
-    logger.info('Phase 4: Executing independent agent missions...');
+    // Run each agent's autonomous brain loop
     for (let i = 0; i < agents.length; i++) {
         try {
-            await runAgentMission(agents[i], AGENT_FLEET[i]);
+            await runAgentWithBrain(agents[i], AGENT_FLEET[i]);
         } catch (error: any) {
-            logger.error(`${AGENT_FLEET[i].name} mission failed: ${error.message}`);
+            logger.error(`${AGENT_FLEET[i].name}: ${error.message}`);
+        }
+
+        if (i < agents.length - 1) {
+            logger.info('Cooldown: 5s before next agent...');
+            await delay(5000);
         }
     }
 
     console.log(chalk.green(`
-═════════════════════════════════════════════════════════
- ✅ MULTI-AGENT FLEET EXECUTION COMPLETE
-═════════════════════════════════════════════════════════
- All ${AGENT_FLEET.length} agents executed independently.
- Each agent maintained its own:
-   • Isolated Keypair (via KeyManager)
-   • Independent Balance
-   • Separate Audit Trail
+=========================================================
+  FLEET EXECUTION COMPLETE
+=========================================================
+  ${AGENT_FLEET.length} agents deployed with autonomous AgentBrain.
+  Commander funding model: one agent funded the fleet.
+  Each agent independently:
+    - Perceived on-chain state
+    - Evaluated rules (FUND_IF_LOW, DEFI, ATTEST, DISTRIBUTE)
+    - Executed the highest-priority matching action
+    - Logged results to audit trail
 
- Audit logs → ${ENV.WALLET_STORAGE_PATH}/audit_log.json
-═════════════════════════════════════════════════════════
+  Audit trail: ${ENV.WALLET_STORAGE_PATH}/audit_log.json
+=========================================================
 `));
 }
 
 process.on('unhandledRejection', (error) => {
-    logger.error(`FATAL Pipeline Error: ${error}`);
+    logger.error(`FATAL: ${error}`);
     process.exit(1);
 });
 
 main().catch((error) => {
-    logger.error(`FATAL Execution Error: ${error}`);
+    logger.error(`FATAL: ${error}`);
     process.exit(1);
 });

@@ -5,9 +5,9 @@ import { SolanaRpcService } from '../services/RpcService';
 import { logger } from '../utils/logger';
 
 /**
- * AgenticWallet Implementation.
- * Encapsulates the KMS subsystem and strictly delegates transactions.
- */
+  AgenticWallet Implementation.
+  Encapsulates the KMS subsystem and strictly delegates transactions.
+ **/
 export class AgenticWallet {
     private keypair: Keypair;
     private rpcService: SolanaRpcService;
@@ -30,16 +30,15 @@ export class AgenticWallet {
     }
 
     /**
-     * The only function that accesses the raw explicit `secretKey`.
-     * Receives fully built intents, validates them cryptographically, signs them, and dispatches.
-     */
+      The only function that accesses the raw explicit `secretKey`.
+      Receives fully built intents, validates them cryptographically, signs them, and dispatches.
+    **/
     public async signAndSendTransaction(transaction: Transaction | VersionedTransaction): Promise<string> {
-        // Enforce arbitrary security checks on the payload to prevent agent prompt injection
         TransactionValidator.validateIntentPayload(transaction);
 
         logger.info(`Vault [${this.name}]: Internal validation passed. Attaching secure signature.`);
         
-        // Assign recent blockhash + payer
+        // Assign recent blockhash
         await this.rpcService.attachRecentBlockhash(transaction, this.keypair.publicKey);
         
         // Execute Pre-flight validation

@@ -7,9 +7,9 @@ import { ENV } from '../config/env';
 import { SecurityError } from '../utils/errors';
 
 /**
- * KeyManager handles the physical security of the Keypair.
- * Extensible for integration into AWS KMS or HashiCorp Vault.
- */
+  KeyManager handles the physical security of the Keypair.
+  Extensible for integration into AWS KMS or HashiCorp Vault.
+ **/
 export class KeyManager {
     static loadOrGenerate(agentName: string): Keypair {
         const lowerName = agentName.toLowerCase();

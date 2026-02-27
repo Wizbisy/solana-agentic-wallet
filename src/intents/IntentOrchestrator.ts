@@ -9,8 +9,8 @@ import { logger } from '../utils/logger';
 import { ConfigurationError } from '../utils/errors';
 
 /**
- * Orchestrates explicit agent intents and routes them to the correct strategic handler.
- */
+  Orchestrates explicit agent intents and routes them to the correct strategic handler.
+ **/
 export class IntentOrchestrator {
     private handlers: Map<IntentType, IntentStrategy> = new Map();
 

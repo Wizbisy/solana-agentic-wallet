@@ -9,7 +9,6 @@ export const logger = {
     console.log(chalk.magenta(`[🤖 ${agentName}]`), chalk.cyan(msg)),
   
   startSpinner: (msg: string) => {
-    // Static spinner replacement for CJS compatibility
     console.log(chalk.cyan('⠋'), chalk.white(msg));
     return {
       succeed: (successMsg: string) => console.log(chalk.green('✔'), chalk.green(successMsg)),

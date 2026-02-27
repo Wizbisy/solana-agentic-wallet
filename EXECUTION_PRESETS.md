@@ -28,6 +28,7 @@ The `DEFI_EXECUTION` Intent accepts *any* valid `Transaction` or `VersionedTrans
 | 10 | Batch Multi-Instruction Tx | Medium | ❌ | Legacy `Transaction` | ~25 |
 | 11 | PDA Derivation & Lookups | Low | ❌ | N/A (Read-Only) | ~15 |
 | 12 | Token-2022 Extensions | High | ❌ | Legacy `Transaction` | ~30 |
+| 13 | Commander Fleet Funding | Low | ❌ | Uses `TRANSFER` intent | ~20 |
 
 ---
 
@@ -880,4 +881,48 @@ If a transaction fails with "incorrect program id for instruction":
 2. Use the correct program ID for ATA derivation and transfer instructions.
 3. Account for transfer fees if the token has the Transfer Fee extension enabled.
 
+---
 
+## 13. Commander Fleet Funding (Multi-Agent)
+
+When deploying multiple agents on Devnet, avoid individual airdrop requests which hit rate limits (429). Instead, fund one agent manually and have it distribute SOL to all peers.
+
+### Step 1: Identify the Commander
+
+```typescript
+const agents: AIAgent[] = fleet.map(name => new AIAgent(name));
+const balances = await Promise.all(agents.map(a => a.getBalance()));
+
+let commanderIdx = 0;
+for (let i = 1; i < balances.length; i++) {
+    if (balances[i] > balances[commanderIdx]) commanderIdx = i;
+}
+
+const commander = agents[commanderIdx];
+console.log(`Commander: ${commander.name} (${balances[commanderIdx]} SOL)`);
+```
+
+### Step 2: Distribute SOL to Peers
+
+```typescript
+const FUND_AMOUNT = 0.05; // SOL per agent
+
+for (let i = 0; i < agents.length; i++) {
+    if (i === commanderIdx) continue;
+    if (balances[i] >= 0.01) continue; // already funded
+
+    await commander.executeIntent('TRANSFER', {
+        target: agents[i].getPublicKey(),
+        amount: FUND_AMOUNT,
+    });
+}
+```
+
+### Why This Works
+
+| Approach | Airdrop per Agent | Commander Model |
+|----------|------------------|-----------------|
+| RPC calls | N airdrops (rate limited) | 1 manual fund + N-1 transfers |
+| 429 errors | Frequent | None |
+| Speed | Slow (retry backoff) | Fast (2s per transfer) |
+| Automation | Breaks on rate limits | Fully automated after initial fund |

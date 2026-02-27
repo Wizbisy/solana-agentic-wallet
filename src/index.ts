@@ -42,9 +42,10 @@ Vault Path       : ${ENV.WALLET_STORAGE_PATH}
     // Action C: Execute Complex Validated DeFi payload (Swap/Routing Execution)
     logger.info(`Orchestrator: Crafting complex outbound DeFi Payload...`);
     
-    // This validates the capacity to execute arbitrary smart-contract payloads 
-    // (e.g. Raydium Swaps or Jupiter routing) by executing a baseline Memo Program instruction.
-    // It verifies the orchestrator's agnostic transaction signing capabilities.
+    /** This validates the capacity to execute arbitrary smart-contract payloads 
+      (e.g. Raydium Swaps or Jupiter routing) by executing a baseline Memo Program instruction.
+      It verifies the orchestrator's agnostic transaction signing capabilities. 
+    **/
     const memoProgramId = new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
     
     const defiPayload = new Transaction().add({

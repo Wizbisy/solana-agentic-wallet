@@ -6,9 +6,9 @@ import { IntentType, IntentOptions } from '../intents/types';
 import { logger } from '../utils/logger';
 
 /**
- * The Master Class that wraps the Secure Boundaries and Intent Strategies.
- * Any top-level external application or LLM flow interacts SOLELY with this class.
- */
+  The Master Class that wraps the Secure Boundaries and Intent Strategies.
+  Any top-level external application or LLM flow interacts SOLELY with this class.
+ **/
 export class AIAgent {
     private wallet: AgenticWallet;
     private orchestrator: IntentOrchestrator;
@@ -25,8 +25,8 @@ export class AIAgent {
     }
 
     /**
-     * Retrieve the active Solana Balance from the RPC.
-     */
+      Retrieve the active Solana Balance from the RPC.
+    **/
     public async getBalance(): Promise<number> {
         return await this.rpcService.getBalance(this.wallet.getPublicKey());
     }
@@ -36,8 +36,8 @@ export class AIAgent {
     }
 
     /**
-     * Send a top-level Intent downstream into the secure execution pipeline.
-     */
+      Send a top-level Intent downstream into the secure execution pipeline.
+    **/
     public async executeIntent(type: IntentType, options?: IntentOptions): Promise<any> {
         return await this.orchestrator.executeIntent(type, options);
     }

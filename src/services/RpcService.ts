@@ -63,7 +63,6 @@ export class SolanaRpcService {
         const { blockhash } = await this.connection.getLatestBlockhash('confirmed');
         
         if ('message' in transaction) {
-            // Override the blockhash for v0 VersionedTransaction messages
             transaction.message.recentBlockhash = blockhash;
         } else {
             transaction.recentBlockhash = blockhash;
