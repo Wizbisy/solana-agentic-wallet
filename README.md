@@ -1,4 +1,4 @@
-# Solana AI Agent Wallet
+# Solana Agentic Wallet
 
 A secure, intent driven infrastructure for autonomous AI agents executing on-chain operations on the Solana blockchain.
 
@@ -6,7 +6,7 @@ This project solves the **Prompt Injection Problem** ensuring that even if an LL
 
 ## Key Features
 
-- **AgentBrain**: Rule-based autonomous decision engine. Agents perceive on-chain state, evaluate configurable rules, and execute actions without human input.
+- **AgentBrain**: Rule based autonomous decision engine. Agents perceive on-chain state, evaluate configurable rules, and execute actions without human input.
 - **Zero Key Exposure**: The AI agent never touches `secretKey`. All signing happens inside the sandboxed `AgenticWallet`.
 - **Intent-Based Execution**: Agents route typed intents (`FUND`, `TRANSFER`, `DEFI_EXECUTION`, `TOKEN_TRANSFER`) through the Strategy Pattern orchestrator.
 - **SPL Token Support**: Create mints, manage Associated Token Accounts, mint and transfer SPL tokens programmatically.
