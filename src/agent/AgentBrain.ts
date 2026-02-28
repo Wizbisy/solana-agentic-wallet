@@ -20,7 +20,7 @@ export interface ActionPlan {
 }
 
 /**
-  AgentBrain Rule Based Autonomous Decision Engine
+  AgentBrain: Rule Based Autonomous Decision Engine
   Evaluates on-chain state against a set of configurable rules and
   produces an action plan that the agent executes. This is the
   autonomous decision making layer that turns a wallet into an agent.
