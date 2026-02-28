@@ -23,7 +23,6 @@ export class KeyManager {
 
         if (fs.existsSync(walletFile)) {
             try {
-                // Decrypt and load the persisted keystore payload
                 const payload = JSON.parse(fs.readFileSync(walletFile, 'utf-8'));
                 if (!payload.encryptedSecret) {
                     throw new SecurityError('Invalid keystore payload');
@@ -36,7 +35,6 @@ export class KeyManager {
             }
         }
 
-        // Generate new keypair in secure enclave
         const newKeypair = Keypair.generate();
         const encryptedSecret = bs58.encode(newKeypair.secretKey); 
 

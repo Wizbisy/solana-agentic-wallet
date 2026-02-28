@@ -54,7 +54,6 @@ export class IntentOrchestrator {
         try {
             const result = await handler.execute(options);
             
-            // Record successful execution
             await AuditLogger.logExecution({
                 agentId: this.wallet.getName(),
                 intentType: type,
@@ -65,7 +64,6 @@ export class IntentOrchestrator {
 
             return result;
         } catch (error: any) {
-            // Record failure
             await AuditLogger.logExecution({
                 agentId: this.wallet.getName(),
                 intentType: type,

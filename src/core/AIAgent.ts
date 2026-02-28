@@ -7,7 +7,7 @@ import { logger } from '../utils/logger';
 
 /**
   The Master Class that wraps the Secure Boundaries and Intent Strategies.
-  Any top-level external application or LLM flow interacts SOLELY with this class.
+  Any top level external application or LLM flow interacts SOLELY with this class.
  **/
 export class AIAgent {
     private wallet: AgenticWallet;
@@ -36,7 +36,7 @@ export class AIAgent {
     }
 
     /**
-      Send a top-level Intent downstream into the secure execution pipeline.
+      Send a top level Intent downstream into the secure execution pipeline.
     **/
     public async executeIntent(type: IntentType, options?: IntentOptions): Promise<any> {
         return await this.orchestrator.executeIntent(type, options);

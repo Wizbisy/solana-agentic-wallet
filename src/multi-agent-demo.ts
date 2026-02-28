@@ -10,7 +10,7 @@ import { exec } from 'child_process';
   Multi-Agent Autonomous Demonstration
 
   Deploys three independent AI agents on Solana Devnet.
-  Uses a "Commander" funding model — the funded agent distributes
+  Uses a "Commander" funding model: the funded agent distributes
   SOL to peers via TRANSFER, avoiding Devnet airdrop rate limits.
 
   Each agent then runs an autonomous AgentBrain decision loop:
@@ -38,7 +38,7 @@ function delay(ms: number): Promise<void> {
 }
 
 /**
-  Commander Funding — the agent with the highest balance
+  Commander Funding: the agent with the highest balance
   distributes SOL to all unfunded peers via TRANSFER intent.
 **/
 async function fundFleetFromCommander(agents: AIAgent[]): Promise<void> {
@@ -57,7 +57,6 @@ async function fundFleetFromCommander(agents: AIAgent[]): Promise<void> {
     const commanderName = AGENT_FLEET[commanderIdx].name;
 
     if (maxBalance < 0.01) {
-        // No agents funded — try airdrop, then browser fallback
         const firstAgent = agents[0];
         const address = firstAgent.getPublicKey().toBase58();
         logger.info(`No funded agents detected. Attempting airdrop for ${AGENT_FLEET[0].name}...`);
@@ -77,7 +76,6 @@ async function fundFleetFromCommander(agents: AIAgent[]): Promise<void> {
             logger.warn(`Airdrop failed. Opening browser to Solana Faucet...`);
             logger.info(`Faucet URL: ${faucetUrl}`);
 
-            // Open browser cross-platform
             const openCmd = process.platform === 'win32' ? `start ${faucetUrl}`
                           : process.platform === 'darwin' ? `open ${faucetUrl}`
                           : `xdg-open ${faucetUrl}`;
@@ -191,13 +189,13 @@ async function runAgentWithBrain(agent: AIAgent, config: AgentConfig): Promise<v
 
     const finalState = brain.getState();
     logger.agent(name, `Final balance: ${finalState.solBalance.toFixed(4)} SOL | Cycles: ${finalState.cyclesCompleted} | Last action: ${finalState.lastAction}`);
-    logger.success(`${name} — autonomous loop complete.`);
+    logger.success(`${name}: autonomous loop complete.`);
 }
 
 async function main() {
     console.log(chalk.cyan(`
 =========================================================
-  SOLANA AI AGENT WALLET — Autonomous Fleet (Devnet)
+  SOLANA AI AGENT WALLET: Autonomous Fleet (Devnet)
 =========================================================
   Environment : ${ENV.ENVIRONMENT}
   RPC Endpoint: ${ENV.SOLANA_RPC_URL}
@@ -212,17 +210,15 @@ async function main() {
     console.log(chalk.yellow('\n  Agent Addresses (fund via https://faucet.solana.com):'));
     for (let i = 0; i < agents.length; i++) {
         const balance = await agents[i].getBalance();
-        const status = balance > 0 ? chalk.green(`${balance.toFixed(4)} SOL`) : chalk.red('0 SOL — NEEDS FUNDING');
+        const status = balance > 0 ? chalk.green(`${balance.toFixed(4)} SOL`) : chalk.red('0 SOL: NEEDS FUNDING');
         console.log(chalk.yellow(`    ${AGENT_FLEET[i].name}: ${agents[i].getPublicKey().toBase58()} [${status}${chalk.yellow(']')}`));
     }
     console.log('');
 
-    // Commander funding: funded agent distributes SOL to peers
     logger.info('Running Commander funding protocol...');
     await fundFleetFromCommander(agents);
     await delay(3000);
 
-    // Run each agent's autonomous brain loop
     for (let i = 0; i < agents.length; i++) {
         try {
             await runAgentWithBrain(agents[i], AGENT_FLEET[i]);
@@ -245,7 +241,7 @@ async function main() {
   Each agent independently:
     - Perceived on-chain state
     - Evaluated rules (FUND_IF_LOW, DEFI, ATTEST, DISTRIBUTE)
-    - Executed the highest-priority matching action
+    - Executed the highest priority matching action
     - Logged results to audit trail
 
   Audit trail: ${ENV.WALLET_STORAGE_PATH}/audit_log.json

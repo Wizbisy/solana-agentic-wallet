@@ -4,7 +4,7 @@ import { SecurityError } from '../utils/errors';
 
 /**
   Validates outbound transactions to prevent unauthorized logic execution
-  or limits being bypassed by a prompt-injected LLM layer.
+  or limits being bypassed by a prompt injected LLM layer.
  **/
 export class TransactionValidator {
     static validateIntentPayload(transaction: Transaction | VersionedTransaction): boolean {

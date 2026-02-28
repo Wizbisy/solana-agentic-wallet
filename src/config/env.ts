@@ -9,7 +9,6 @@ export const ENV = {
     AGENT_NAME: process.env.AGENT_NAME || 'Nexus-Prime',
 };
 
-// Validate critical variables
 if (!ENV.SOLANA_RPC_URL.startsWith('http')) {
     throw new Error('FATAL: Invalid SOLANA_RPC_URL in configuration.');
 }

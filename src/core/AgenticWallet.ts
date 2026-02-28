@@ -15,9 +15,7 @@ export class AgenticWallet {
 
     constructor(name: string, rpcService: SolanaRpcService) {
         this.name = name;
-        this.rpcService = rpcService;
-        
-        // securely load the physical keypair via Vault integration
+        this.rpcService = rpcService;       
         this.keypair = KeyManager.loadOrGenerate(name);
     }
 
@@ -38,25 +36,21 @@ export class AgenticWallet {
 
         logger.info(`Vault [${this.name}]: Internal validation passed. Attaching secure signature.`);
         
-        // Assign recent blockhash
         await this.rpcService.attachRecentBlockhash(transaction, this.keypair.publicKey);
         
-        // Execute Pre-flight validation
-        logger.info(`Vault [${this.name}]: Executing Pre-flight validation...`);
+        logger.info(`Vault [${this.name}]: Executing Pre flight validation...`);
         const simResult = await this.rpcService.simulateTransaction(transaction);
         if (!simResult) {
-            throw new Error(`Pre-flight validation failed. Context aborted before signing.`);
+            throw new Error(`Pre flight validation failed. Context aborted before signing.`);
         }
-        logger.success(`Vault [${this.name}]: Pre-flight validation OK.`);
+        logger.success(`Vault [${this.name}]: Pre flight validation OK.`);
 
-        // Secure Signature execution
         if ('message' in transaction) {
             transaction.sign([this.keypair]);
         } else {
             transaction.sign(this.keypair);
         }
 
-        // Network dispatch
         return await this.rpcService.sendTransaction(transaction);
     }
 }

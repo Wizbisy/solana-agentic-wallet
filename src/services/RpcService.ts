@@ -50,12 +50,12 @@ export class SolanaRpcService {
             }
 
             if (result.value.err) {
-                logger.error(`RPC Pre-flight Validation Failed: ${JSON.stringify(result.value.err)}`);
+                logger.error(`RPC Pre flight Validation Failed: ${JSON.stringify(result.value.err)}`);
                 return false;
             }
             return true;
         } catch (error: any) {
-            throw new NetworkError(`RPC Pre-flight request failed: ${error.message}`);
+            throw new NetworkError(`RPC Pre flight request failed: ${error.message}`);
         }
     }
 

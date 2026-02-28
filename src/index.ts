@@ -3,6 +3,7 @@ import { AIAgent } from './core/AIAgent';
 import { logger } from './utils/logger';
 import { ENV } from './config/env';
 import chalk from 'chalk';
+import { exec } from 'child_process';
 
 async function main() {
     console.log(chalk.cyan(`
@@ -15,34 +16,52 @@ Vault Path       : ${ENV.WALLET_STORAGE_PATH}
 =========================================================
 `));
 
-    // 1. Initialize the AI Agent. It handles Key Management securely via its Core bindings.
     logger.info('Initializing Orchestrator Sequence...');
     const agent = new AIAgent(ENV.AGENT_NAME);
 
-    // 2. Fetch Initial Balance
-    const balance = await agent.getBalance();
+    let balance = await agent.getBalance();
     logger.agent(agent.name, `Current Node Balance: ${balance} SOL`);
 
-    // 3. Execution Pipeline Validation
-
-    // Action A: Request Fund
     if (balance < 0.01) {
-        await agent.executeIntent('FUND');
+        const result = await agent.executeIntent('FUND');
+
+        balance = await agent.getBalance();
+        if (balance < 0.01) {
+            const address = agent.getPublicKey().toBase58();
+            const faucetUrl = `https://faucet.solana.com/?address=${address}`;
+            logger.warn('Airdrop failed. Opening browser to Solana Faucet...');
+            logger.info(`Faucet URL: ${faucetUrl}`);
+
+            const openCmd = process.platform === 'win32' ? `start ${faucetUrl}`
+                          : process.platform === 'darwin' ? `open ${faucetUrl}`
+                          : `xdg-open ${faucetUrl}`;
+            exec(openCmd);
+
+            console.log(chalk.yellow(`\n  ⏳ Please fund ${agent.name} in the browser, then press Enter to continue...`));
+            await new Promise<void>(resolve => {
+                process.stdin.once('data', () => resolve());
+            });
+
+            balance = await agent.getBalance();
+            if (balance < 0.005) {
+                logger.error(`${agent.name} still has ${balance.toFixed(4)} SOL. Please fund and re-run.`);
+                process.exit(1);
+            }
+            logger.success(`${agent.name} funded! Balance: ${balance.toFixed(4)} SOL`);
+        }
     } else {
         logger.agent(agent.name, `Balance is sufficient (${balance} SOL). Skipping devnet FUND request.`);
     }
 
-    // Action B: Execute Transfer
     const targetAddress = Keypair.generate().publicKey;
     await agent.executeIntent('TRANSFER', {
         target: targetAddress,
         amount: 0.005
     });
 
-    // Action C: Execute Complex Validated DeFi payload (Swap/Routing Execution)
     logger.info(`Orchestrator: Crafting complex outbound DeFi Payload...`);
     
-    /** This validates the capacity to execute arbitrary smart-contract payloads 
+    /** This validates the capacity to execute arbitrary smart contract payloads 
       (e.g. Raydium Swaps or Jupiter routing) by executing a baseline Memo Program instruction.
       It verifies the orchestrator's agnostic transaction signing capabilities. 
     **/
@@ -66,7 +85,6 @@ Audit logs saved to Database Layer successfully.
 `));
 }
 
-// Global Rejection Handler
 process.on('unhandledRejection', (error) => {
     logger.error(`FATAL Pipeline Error: ${error}`);
     process.exit(1);
